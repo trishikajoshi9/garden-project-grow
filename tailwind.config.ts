@@ -57,6 +57,21 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        panel: {
+          header: "hsl(var(--panel-header))",
+          border: "hsl(var(--panel-border))",
+        },
+        editor: {
+          DEFAULT: "hsl(var(--editor-bg))",
+          line: "hsl(var(--editor-line))",
+        },
+        terminal: "hsl(var(--terminal-bg))",
+        chat: {
+          user: "hsl(var(--chat-user))",
+          ai: "hsl(var(--chat-ai))",
+        },
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
       },
       borderRadius: {
         lg: "var(--radius)",
