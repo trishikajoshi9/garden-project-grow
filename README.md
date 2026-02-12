@@ -1,73 +1,123 @@
-# Welcome to your Lovable project
+# Garden Project Grow — AI App Builder
 
-## Project info
+A professional React + Supabase AI app builder that can generate complete web apps from prompts, optionally using **image attachments** as visual references.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Highlights
 
-## How can I edit this code?
+- **Vercel AI Gateway compatible backend** (OpenAI-compatible Chat Completions API)
+- **Configurable model routing** via environment variables
+- **Image attachment support in chat** (vision-capable models)
+- **Ollama local and cloud-ready setup guidance**
+- **Hugging Face model recommendation** for code/web generation workflows
 
-There are several ways of editing your application.
+## Stack
 
-**Use Lovable**
+- Vite + React + TypeScript
+- Tailwind + shadcn/ui
+- Zustand state management
+- Supabase Edge Function (`generate-app`) as AI gateway proxy
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Local Development
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Environment Configuration
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Create/update your `.env` and Supabase secrets for the Edge Function:
 
-**Use GitHub Codespaces**
+### Required
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- `LOVABLE_API_KEY`: API key used by the gateway endpoint.
 
-## What technologies are used for this project?
+### Optional (recommended)
 
-This project is built with:
+- `AI_GATEWAY_URL`: OpenAI-compatible endpoint.
+  - Default: `https://ai.gateway.lovable.dev/v1/chat/completions`
+- `AI_MODEL`: Model identifier accepted by your gateway/provider.
+  - Default: `openai/gpt-4.1-mini`
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+> The app now supports both text-only and multimodal (`image_url`) chat payloads when an image is attached.
 
-## How can I deploy this project?
+## Vercel AI Gateway Setup
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Use an OpenAI-compatible gateway URL and route requests through the Supabase Edge Function:
 
-## Can I connect a custom domain to my Lovable project?
+```bash
+AI_GATEWAY_URL=https://gateway.ai.vercel.com/v1/chat/completions
+AI_MODEL=openai/gpt-4.1-mini
+```
 
-Yes, you can!
+Then configure your function secret for auth headers (token/key expected by your gateway route).
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Ollama Installation (Local)
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### macOS / Linux
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama serve
+ollama pull llama3.1:8b
+```
+
+### Windows
+
+1. Install from: https://ollama.com/download
+2. Start Ollama.
+3. Pull a model:
+
+```bash
+ollama pull llama3.1:8b
+```
+
+### Route through OpenAI-compatible interface
+
+If your Ollama endpoint exposes OpenAI-compatible routes, set:
+
+```bash
+AI_GATEWAY_URL=http://localhost:11434/v1/chat/completions
+AI_MODEL=llama3.1:8b
+```
+
+## Ollama Cloud / Remote Deployment
+
+For managed or cloud-hosted Ollama-compatible endpoints:
+
+```bash
+AI_GATEWAY_URL=https://<your-ollama-cloud-endpoint>/v1/chat/completions
+AI_MODEL=llama3.1:70b
+```
+
+Use secure token-based auth and set your secret in Supabase so the Edge Function can call your remote endpoint privately.
+
+## Hugging Face Model Recommendation
+
+For high-quality coding/web generation, a strong option is:
+
+- **Qwen/Qwen2.5-Coder-32B-Instruct**
+
+If available through your gateway/provider, set:
+
+```bash
+AI_MODEL=Qwen/Qwen2.5-Coder-32B-Instruct
+```
+
+Choose a vision-capable model whenever you want to use chat image attachments.
+
+## Chat Image Attachment
+
+The chat composer now supports attaching an image file:
+
+- Click the paperclip icon
+- Select an image
+- Send with or without text prompt
+
+The image is sent to the Edge Function as `imageDataUrl`, then forwarded in OpenAI-style multimodal format (`content` with `text` + `image_url`).
+
+## Deploy
+
+- Deploy frontend on Vercel/Netlify/your preferred host.
+- Deploy Supabase Edge Function (`generate-app`) with required secrets.
+- Point `AI_GATEWAY_URL` + `AI_MODEL` to your production provider.

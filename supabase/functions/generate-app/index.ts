@@ -18,11 +18,16 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const { prompt, conversationHistory } = await req.json();
+    const { prompt, conversationHistory, imageDataUrl } = await req.json();
 
-    if (!prompt) {
-      throw new Error("No prompt provided");
+    if (!prompt && !imageDataUrl) {
+      throw new Error("No prompt or image provided");
     }
+
+    const aiGatewayUrl = Deno.env.get("AI_GATEWAY_URL") ||
+      "https://ai.gateway.lovable.dev/v1/chat/completions";
+    const aiModel = Deno.env.get("AI_MODEL") ||
+      "openai/gpt-4.1-mini";
 
     const systemPrompt = `You are an expert web developer AI that generates complete, working web applications.
 
@@ -52,24 +57,32 @@ IMPORTANT: Return ONLY raw HTML code. No \`\`\`html blocks, no explanations befo
       }
     }
 
-    messages.push({ role: "user", content: prompt });
+    if (imageDataUrl) {
+      const promptWithFallback = prompt || "Use the attached image as a visual reference and generate a complete web app.";
+      messages.push({
+        role: "user",
+        content: [
+          { type: "text", text: promptWithFallback },
+          { type: "image_url", image_url: { url: imageDataUrl } },
+        ],
+      });
+    } else {
+      messages.push({ role: "user", content: prompt });
+    }
 
-    const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages,
-          max_tokens: 16000,
-          temperature: 0.7,
-        }),
-      }
-    );
+    const response = await fetch(aiGatewayUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: aiModel,
+        messages,
+        max_tokens: 16000,
+        temperature: 0.7,
+      }),
+    });
 
     if (!response.ok) {
       const errText = await response.text();
