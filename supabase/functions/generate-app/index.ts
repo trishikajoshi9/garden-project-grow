@@ -29,23 +29,23 @@ serve(async (req) => {
     const aiModel = Deno.env.get("AI_MODEL") ||
       "openai/gpt-4.1-mini";
 
-    const systemPrompt = `You are an expert web developer AI that generates complete, working web applications.
+    const systemPrompt = `You are an expert TypeScript web developer AI that generates complete, working Vite + React + TypeScript applications.
 
-When a user describes what they want, you generate a COMPLETE standalone HTML file that includes all HTML, CSS, and JavaScript needed.
+When a user describes what they want, generate a TypeScript-first project structure (not a single standalone HTML/CSS document).
 
 RULES:
-1. Always return a COMPLETE HTML document with <!DOCTYPE html>, <html>, <head>, <body>
-2. Include ALL CSS inline in a <style> tag
-3. Include ALL JavaScript inline in a <script> tag
-4. Make the output visually beautiful with modern design
-5. Use animations, gradients, and smooth transitions where appropriate
-6. Make it responsive
-7. Use modern CSS features (flexbox, grid, custom properties)
-8. The app should be fully functional and interactive
-9. Do NOT use any external CDN links or imports
-10. Return ONLY the HTML code, no explanations, no markdown code blocks
+1. Default stack: Vite + React + TypeScript.
+2. Prefer TS/TSX source files (src/main.tsx, src/App.tsx, components, hooks, utils, etc.).
+3. Keep styling inside TypeScript-friendly patterns (CSS modules, inline style objects, or minimal separate CSS only when required).
+4. Avoid generating pure static HTML/CSS-only apps.
+5. Do not add explanations outside code.
+6. Return output as one or more fenced code blocks, each with this exact format:
+   \`\`\`file:path/to/file.ext
+   ...file contents...
+   \`\`\`
+7. Include enough files so the generated app is runnable.
 
-IMPORTANT: Return ONLY raw HTML code. No \`\`\`html blocks, no explanations before or after. Just the pure HTML document.`;
+IMPORTANT: Return only file code blocks in the required file format. No prose.`;
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -90,19 +90,17 @@ IMPORTANT: Return ONLY raw HTML code. No \`\`\`html blocks, no explanations befo
     }
 
     const data = await response.json();
-    let generatedCode = data.choices?.[0]?.message?.content || "";
-
-    // Clean up any markdown wrapping
-    generatedCode = generatedCode.replace(/^```html\s*/i, "").replace(/\s*```$/i, "").trim();
+    const generatedMessage = data.choices?.[0]?.message?.content || "";
 
     // Extract file structure from the generated code
-    const files = parseGeneratedFiles(generatedCode);
+    const files = parseGeneratedFiles(generatedMessage);
+    const generatedCode = getPreviewCode(files, generatedMessage);
 
     return new Response(
       JSON.stringify({
         code: generatedCode,
         files,
-        message: data.choices?.[0]?.message?.content || "",
+        message: generatedMessage,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -122,6 +120,23 @@ IMPORTANT: Return ONLY raw HTML code. No \`\`\`html blocks, no explanations befo
 function parseGeneratedFiles(code: string) {
   const files: { name: string; type: string; content: string }[] = [];
 
+  const fileBlockRegex = /```file:([^\n]+)\n([\s\S]*?)```/g;
+  const seen = new Set<string>();
+
+  for (const match of code.matchAll(fileBlockRegex)) {
+    const name = match[1].trim();
+    const content = match[2].replace(/\s+$/, "");
+
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+
+    files.push({ name, type: detectFileType(name), content });
+  }
+
+  if (files.length > 0) {
+    return files;
+  }
+
   // Main HTML file
   files.push({ name: "index.html", type: "html", content: code });
 
@@ -138,4 +153,34 @@ function parseGeneratedFiles(code: string) {
   }
 
   return files;
+}
+
+function detectFileType(fileName: string) {
+  const ext = fileName.split(".").pop()?.toLowerCase();
+  if (!ext) return "text";
+
+  const map: Record<string, string> = {
+    ts: "ts",
+    tsx: "tsx",
+    js: "js",
+    jsx: "jsx",
+    json: "json",
+    css: "css",
+    html: "html",
+    md: "md",
+  };
+
+  return map[ext] || ext;
+}
+
+function getPreviewCode(
+  files: { name: string; type: string; content: string }[],
+  fallback: string,
+) {
+  const htmlFile = files.find((file) => file.name === "index.html");
+  if (htmlFile) {
+    return htmlFile.content;
+  }
+
+  return fallback;
 }
