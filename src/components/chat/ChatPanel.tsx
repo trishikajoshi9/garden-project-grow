@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Sparkles, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect, ChangeEvent } from "react";
+import { Send, Bot, User, Sparkles, Loader2, Paperclip, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useAppStore } from "@/store/useAppStore";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,24 +17,48 @@ const ChatPanel = () => {
     todos,
   } = useAppStore();
   const [input, setInput] = useState("");
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const [attachedImageName, setAttachedImageName] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setAttachedImage(result);
+        setAttachedImageName(file.name);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || isGenerating) return;
+    if ((!input.trim() && !attachedImage) || isGenerating) return;
 
     const userMsg = {
       id: Date.now().toString(),
       role: "user" as const,
-      content: input,
+      content: input || "Analyze this image and build an app inspired by it.",
+      imageUrl: attachedImage || undefined,
       timestamp: new Date(),
     };
     addMessage(userMsg);
     const currentInput = input;
+    const currentImage = attachedImage;
     setInput("");
+    setAttachedImage(null);
+    setAttachedImageName(null);
     setIsGenerating(true);
 
     // Add generating todo
@@ -50,7 +74,7 @@ const ChatPanel = () => {
         .map((m) => ({ role: m.role, content: m.content }));
 
       const { data, error } = await supabase.functions.invoke("generate-app", {
-        body: { prompt: currentInput, conversationHistory },
+        body: { prompt: currentInput, conversationHistory, imageDataUrl: currentImage },
       });
 
       if (error) throw error;
@@ -132,6 +156,13 @@ const ChatPanel = () => {
               <div className="prose prose-sm prose-invert max-w-none [&_p]:my-1 [&_ul]:my-1 [&_li]:my-0 [&_code]:text-primary [&_code]:bg-muted [&_code]:px-1 [&_code]:rounded">
                 <ReactMarkdown>{msg.content}</ReactMarkdown>
               </div>
+              {msg.imageUrl && (
+                <img
+                  src={msg.imageUrl}
+                  alt="Attached reference"
+                  className="mt-3 rounded-lg border border-border/60 max-h-56 w-auto"
+                />
+              )}
             </div>
           </div>
         ))}
@@ -152,7 +183,41 @@ const ChatPanel = () => {
       </div>
 
       <div className="p-3 border-t border-border">
+        {attachedImage && (
+          <div className="mb-2 rounded-lg border border-border bg-secondary/60 p-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <img src={attachedImage} alt="Upload preview" className="w-10 h-10 rounded object-cover" />
+              <span className="text-xs text-muted-foreground truncate">{attachedImageName || "Attached image"}</span>
+            </div>
+            <button
+              onClick={() => {
+                setAttachedImage(null);
+                setAttachedImageName(null);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+              }}
+              className="w-7 h-7 rounded-md hover:bg-muted flex items-center justify-center"
+              aria-label="Remove image"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         <div className="flex items-center gap-2 bg-secondary rounded-xl px-3 py-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isGenerating}
+            className="w-8 h-8 rounded-lg border border-border text-muted-foreground flex items-center justify-center hover:bg-muted transition-colors disabled:opacity-30"
+            aria-label="Attach image"
+          >
+            <Paperclip className="w-4 h-4" />
+          </button>
           <input
             type="text"
             value={input}
@@ -164,7 +229,7 @@ const ChatPanel = () => {
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isGenerating}
+            disabled={(!input.trim() && !attachedImage) || isGenerating}
             className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-30"
           >
             {isGenerating ? (
