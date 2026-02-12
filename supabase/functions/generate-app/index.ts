@@ -18,9 +18,14 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const { prompt, conversationHistory, imageDataUrl } = await req.json();
+    const { prompt, conversationHistory, imageDataUrl, attachments } = await req.json();
 
-    if (!prompt && !imageDataUrl) {
+    const allAttachments = Array.isArray(attachments) ? attachments : [];
+    const imageAttachment = allAttachments.find((file: { dataUrl?: string }) => file.dataUrl);
+    const textAttachments = allAttachments.filter((file: { textContent?: string }) => file.textContent);
+    const resolvedImageDataUrl = imageDataUrl || imageAttachment?.dataUrl;
+
+    if (!prompt && !resolvedImageDataUrl && textAttachments.length === 0) {
       throw new Error("No prompt or image provided");
     }
 
@@ -57,17 +62,33 @@ IMPORTANT: Return ONLY raw HTML code. No \`\`\`html blocks, no explanations befo
       }
     }
 
-    if (imageDataUrl) {
-      const promptWithFallback = prompt || "Use the attached image as a visual reference and generate a complete web app.";
+    const promptWithAttachmentContext = [
+      prompt || "",
+      ...(textAttachments.length > 0
+        ? [
+            "\nAttached text files context:\n" +
+            textAttachments
+              .map((file: { name: string; textContent?: string }) => `### ${file.name}\n${file.textContent || ""}`)
+              .join("\n\n"),
+          ]
+        : []),
+    ]
+      .join("\n")
+      .trim();
+
+    if (resolvedImageDataUrl) {
+      const promptWithFallback =
+        promptWithAttachmentContext ||
+        "Use the attached image as a visual reference and generate a complete web app.";
       messages.push({
         role: "user",
         content: [
           { type: "text", text: promptWithFallback },
-          { type: "image_url", image_url: { url: imageDataUrl } },
+          { type: "image_url", image_url: { url: resolvedImageDataUrl } },
         ],
       });
     } else {
-      messages.push({ role: "user", content: prompt });
+      messages.push({ role: "user", content: promptWithAttachmentContext });
     }
 
     const response = await fetch(aiGatewayUrl, {
@@ -96,7 +117,7 @@ IMPORTANT: Return ONLY raw HTML code. No \`\`\`html blocks, no explanations befo
     generatedCode = generatedCode.replace(/^```html\s*/i, "").replace(/\s*```$/i, "").trim();
 
     // Extract file structure from the generated code
-    const files = parseGeneratedFiles(generatedCode);
+    const files = parseGeneratedFiles(generatedCode, promptWithAttachmentContext);
 
     return new Response(
       JSON.stringify({
@@ -119,23 +140,29 @@ IMPORTANT: Return ONLY raw HTML code. No \`\`\`html blocks, no explanations befo
   }
 });
 
-function parseGeneratedFiles(code: string) {
+function parseGeneratedFiles(code: string, prompt: string) {
   const files: { name: string; type: string; content: string }[] = [];
 
   // Main HTML file
-  files.push({ name: "index.html", type: "html", content: code });
+  files.push({ name: "web/index.html", type: "html", content: code });
 
   // Extract CSS
   const styleMatch = code.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
   if (styleMatch) {
-    files.push({ name: "styles.css", type: "css", content: styleMatch[1].trim() });
+    files.push({ name: "web/styles.css", type: "css", content: styleMatch[1].trim() });
   }
 
   // Extract JS
   const scriptMatch = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
   if (scriptMatch) {
-    files.push({ name: "script.js", type: "js", content: scriptMatch[1].trim() });
+    files.push({ name: "web/script.js", type: "js", content: scriptMatch[1].trim() });
   }
+
+  files.push({
+    name: "app/spec.md",
+    type: "md",
+    content: `# App Builder Spec\n\n## Source Prompt\n\n${prompt || "No prompt provided."}`,
+  });
 
   return files;
 }

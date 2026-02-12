@@ -6,11 +6,20 @@ export interface GeneratedFile {
   content: string;
 }
 
+export interface Attachment {
+  name: string;
+  type: string;
+  size: number;
+  dataUrl?: string;
+  textContent?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   imageUrl?: string;
+  attachments?: Attachment[];
   timestamp: Date;
 }
 
@@ -58,9 +67,14 @@ export const useAppStore = create<AppState>((set) => ({
 
   generatedCode: "",
   generatedFiles: [],
-  setGeneratedCode: (code, files) => set({ generatedCode: code, generatedFiles: files }),
+  setGeneratedCode: (code, files) =>
+    set({
+      generatedCode: code,
+      generatedFiles: files,
+      selectedFile: files[0]?.name || "",
+    }),
 
-  selectedFile: "index.html",
+  selectedFile: "",
   setSelectedFile: (name) => set({ selectedFile: name }),
 
   todos: [
