@@ -37,13 +37,14 @@ RULES:
 1. Default stack: Vite + React + TypeScript.
 2. Prefer TS/TSX source files (src/main.tsx, src/App.tsx, components, hooks, utils, etc.).
 3. Keep styling inside TypeScript-friendly patterns (CSS modules, inline style objects, or minimal separate CSS only when required).
-4. Avoid generating pure static HTML/CSS-only apps.
-5. Do not add explanations outside code.
-6. Return output as one or more fenced code blocks, each with this exact format:
+4. Never return a single static HTML/CSS/JS snippet as the primary output.
+5. Always generate a full Vite project structure with TypeScript entry points (`src/main.tsx`, `src/App.tsx`) and supporting files.
+6. Do not add explanations outside code.
+7. Return output as one or more fenced code blocks, each with this exact format:
    \`\`\`file:path/to/file.ext
    ...file contents...
    \`\`\`
-7. Include enough files so the generated app is runnable.
+8. Include enough files so the generated app is runnable with `npm install && npm run dev`.
 
 IMPORTANT: Return only file code blocks in the required file format. No prose.`;
 
