@@ -83,11 +83,15 @@ const ChatPanel = () => {
 
       const code = data.code || "";
       const files = data.files || [];
+      const hasHtmlPreview = files.some((f: { name: string }) => f.name === "index.html");
 
       setGeneratedCode(code, files);
 
       addTerminalLine("info", "✅ Code generated successfully!");
       addTerminalLine("output", `   ${files.length} file(s) created`);
+      if (!hasHtmlPreview) {
+        addTerminalLine("info", "ℹ️ TypeScript multi-file app detected. Use the Code panel to review generated TS/TSX files.");
+      }
 
       // Mark todo as done
       const existingTodo = todos.find((t) => t.text.startsWith("Generate:"));
@@ -96,9 +100,16 @@ const ChatPanel = () => {
       const assistantMsg = {
         id: (Date.now() + 1).toString(),
         role: "assistant" as const,
-        content: `I've built your app! Here's what I created:\n\n📁 **${files.length} files generated**\n${files
+        content: `I've built your app! Here's what I created:
+
+📁 **${files.length} files generated**
+${files
           .map((f: { name: string }) => `- \`${f.name}\``)
-          .join("\n")}\n\nCheck the **Preview** panel to see it live! You can also switch to **Code** view to see the source.`,
+          .join("\n")}
+
+${hasHtmlPreview
+            ? "Check the **Preview** panel to see it live! You can also switch to **Code** view to inspect the source."
+            : "This output is TypeScript-first (TS/TSX multi-file project). Use the **Code** view to inspect and export the project files."}`,
         timestamp: new Date(),
       };
       addMessage(assistantMsg);

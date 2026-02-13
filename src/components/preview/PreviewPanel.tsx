@@ -3,11 +3,12 @@ import { Globe, RefreshCw, Smartphone, Monitor, ExternalLink, Loader2 } from "lu
 import { useAppStore } from "@/store/useAppStore";
 
 const PreviewPanel = () => {
-  const { generatedCode, isGenerating } = useAppStore();
+  const { generatedCode, generatedFiles, isGenerating } = useAppStore();
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [key, setKey] = useState(0);
 
   const hasPreview = generatedCode.length > 0;
+  const hasGeneratedFiles = generatedFiles.length > 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -83,7 +84,18 @@ const PreviewPanel = () => {
               sandbox="allow-scripts allow-modals"
               title="App Preview"
             />
+          ) : hasGeneratedFiles ? (
+            <div className="w-full h-full flex items-center justify-center p-8">
+              <div className="text-center space-y-3 max-w-md">
+                <h2 className="text-lg font-semibold text-foreground">TypeScript project generated</h2>
+                <p className="text-sm text-muted-foreground">
+                  A multi-file TS/TSX app was created without a standalone HTML preview file.
+                  Open the <span className="text-foreground font-medium">Code</span> view to inspect files and run it locally with Vite.
+                </p>
+              </div>
+            </div>
           ) : (
+
             <div className="w-full h-full flex flex-col">
               <div className="bg-secondary/50 p-3 border-b border-border">
                 <div className="flex items-center gap-2">

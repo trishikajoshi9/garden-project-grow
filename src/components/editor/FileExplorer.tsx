@@ -12,10 +12,10 @@ import { useAppStore } from "@/store/useAppStore";
 
 const getFileIcon = (name: string) => {
   if (name.endsWith(".json")) return <FileJson className="w-4 h-4 text-warning" />;
-  if (name.endsWith(".html")) return <FileCode2 className="w-4 h-4 text-destructive" />;
   if (name.endsWith(".css")) return <FileCode2 className="w-4 h-4 text-accent" />;
-  if (name.endsWith(".js") || name.endsWith(".ts") || name.endsWith(".tsx"))
-    return <FileCode2 className="w-4 h-4 text-primary" />;
+  if (name.endsWith(".ts") || name.endsWith(".tsx")) return <FileCode2 className="w-4 h-4 text-primary" />;
+  if (name.endsWith(".js") || name.endsWith(".jsx")) return <FileCode2 className="w-4 h-4 text-warning" />;
+  if (name.endsWith(".html")) return <FileCode2 className="w-4 h-4 text-destructive" />;
   return <FileText className="w-4 h-4 text-muted-foreground" />;
 };
 

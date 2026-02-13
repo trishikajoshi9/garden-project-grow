@@ -182,5 +182,5 @@ function getPreviewCode(
     return htmlFile.content;
   }
 
-  return fallback;
+  return "";
 }

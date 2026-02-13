@@ -3,7 +3,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { useState, useRef, useEffect } from "react";
 
 const TerminalPanel = () => {
-  const { terminalLines, addTerminalLine, clearTerminal } = useAppStore();
+  const { terminalLines, addTerminalLine, clearTerminal, generatedFiles } = useAppStore();
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -20,7 +20,7 @@ const TerminalPanel = () => {
     } else if (input === "help") {
       addTerminalLine("info", "Commands: help, clear, ls, status");
     } else if (input === "ls") {
-      addTerminalLine("output", "index.html  styles.css  script.js");
+      addTerminalLine("output", generatedFiles.length ? generatedFiles.map((file) => file.name).join("  ") : "No generated files yet");
     } else if (input === "status") {
       addTerminalLine("info", "✅ Tritec Platform v1.0 — AI ready");
     } else {
