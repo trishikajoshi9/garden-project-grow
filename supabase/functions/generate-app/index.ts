@@ -94,7 +94,7 @@ IMPORTANT: Return only file code blocks in the required file format. No prose.`;
 
     // Extract file structure from the generated code
     const files = parseGeneratedFiles(generatedMessage);
-    const generatedCode = getPreviewCode(files, generatedMessage);
+    const generatedCode = getPreviewCode(files);
 
     return new Response(
       JSON.stringify({
@@ -175,7 +175,6 @@ function detectFileType(fileName: string) {
 
 function getPreviewCode(
   files: { name: string; type: string; content: string }[],
-  fallback: string,
 ) {
   const htmlFile = files.find((file) => file.name === "index.html");
   if (htmlFile) {
