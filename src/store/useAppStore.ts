@@ -58,9 +58,19 @@ export const useAppStore = create<AppState>((set) => ({
 
   generatedCode: "",
   generatedFiles: [],
-  setGeneratedCode: (code, files) => set({ generatedCode: code, generatedFiles: files }),
+  setGeneratedCode: (code, files) => {
+    const preferredFile = files.find((file) =>
+      ["src/main.tsx", "src/App.tsx", "main.tsx", "App.tsx", "index.html"].includes(file.name)
+    )?.name;
 
-  selectedFile: "index.html",
+    set({
+      generatedCode: code,
+      generatedFiles: files,
+      selectedFile: preferredFile || files[0]?.name || "",
+    });
+  },
+
+  selectedFile: "",
   setSelectedFile: (name) => set({ selectedFile: name }),
 
   todos: [
