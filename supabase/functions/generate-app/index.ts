@@ -178,9 +178,192 @@ function getPreviewCode(
   fallback: string,
 ) {
   const htmlFile = files.find((file) => file.name === "index.html");
+  const hasViteEntry = files.some((file) =>
+    ["src/main.tsx", "src/main.ts", "src/main.jsx", "src/main.js"].includes(file.name)
+  );
+
+  if (hasViteEntry) {
+    return buildInlineVitePreview(files, fallback);
+  }
+
   if (htmlFile) {
     return htmlFile.content;
   }
 
   return fallback;
+}
+
+function buildInlineVitePreview(
+  files: { name: string; type: string; content: string }[],
+  fallback: string,
+) {
+  const moduleFiles = files.filter((file) =>
+    ["ts", "tsx", "js", "jsx", "mjs", "cjs"].includes(file.type)
+  );
+
+  const entry = ["src/main.tsx", "src/main.ts", "src/main.jsx", "src/main.js"]
+    .find((candidate) => moduleFiles.some((file) => file.name === candidate));
+
+  if (!entry) {
+    return fallback;
+  }
+
+  const cssByFile = Object.fromEntries(
+    files
+      .filter((file) => file.type === "css")
+      .map((file) => [file.name, file.content]),
+  );
+
+  const moduleByFile = Object.fromEntries(
+    moduleFiles.map((file) => [file.name, file.content]),
+  );
+
+  const escapedModules = JSON.stringify(moduleByFile).replace(/<\/(script)/gi, "<\\/$1");
+  const escapedCss = JSON.stringify(cssByFile).replace(/<\/(script)/gi, "<\\/$1");
+  const escapedEntry = entry.replace(/"/g, '\\"');
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Generated App Preview</title>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      const moduleByFile = ${escapedModules};
+      const cssByFile = ${escapedCss};
+      const entryFile = "${escapedEntry}";
+      const extensions = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"];
+
+      function normalizePath(path) {
+        const parts = [];
+        for (const chunk of path.split("/")) {
+          if (!chunk || chunk === ".") continue;
+          if (chunk === "..") {
+            parts.pop();
+            continue;
+          }
+          parts.push(chunk);
+        }
+        return parts.join("/");
+      }
+
+      function resolveImport(fromFile, specifier) {
+        if (!specifier.startsWith(".") && !specifier.startsWith("/")) {
+          return { kind: "bare", value: specifier };
+        }
+
+        const fromParts = fromFile.split("/").slice(0, -1);
+        const target = specifier.startsWith("/")
+          ? normalizePath(specifier)
+          : normalizePath([...fromParts, specifier].join("/"));
+
+        if (moduleByFile[target]) {
+          return { kind: "module", value: target };
+        }
+
+        for (const ext of extensions) {
+          if (moduleByFile[target + ext]) {
+            return { kind: "module", value: target + ext };
+          }
+        }
+
+        if (cssByFile[target]) {
+          return { kind: "css", value: target };
+        }
+
+        if (cssByFile[target + ".css"]) {
+          return { kind: "css", value: target + ".css" };
+        }
+
+        return { kind: "missing", value: target };
+      }
+
+      const style = document.createElement("style");
+      style.setAttribute("data-generated-preview", "true");
+      document.head.appendChild(style);
+      const appendedCss = new Set();
+
+      const moduleUrls = {};
+      const building = new Set();
+
+      function rewriteSpecifiers(code, fileName) {
+        const importExportRegex = /(import\\s+(?:[^'"\\n]+?\\s+from\\s+)?|export\\s+[^'"\\n]*?\\s+from\\s+)(["'])([^"']+)(["'])/g;
+        const dynamicImportRegex = /(import\\(\\s*)(["'])([^"']+)(["'])(\\s*\\))/g;
+
+        const rewrite = (_, start, quoteStart, specifier, quoteEnd) => {
+          const resolved = resolveImport(fileName, specifier);
+
+          if (resolved.kind === "css") {
+            if (!appendedCss.has(resolved.value)) {
+              style.textContent += "\\n" + (cssByFile[resolved.value] || "");
+              appendedCss.add(resolved.value);
+            }
+            return "";
+          }
+
+          if (resolved.kind === "module") {
+            ensureModuleUrl(resolved.value);
+            return `${start}${quoteStart}${moduleUrls[resolved.value]}${quoteEnd}`;
+          }
+
+          if (resolved.kind === "bare") {
+            return `${start}${quoteStart}https://esm.sh/${specifier}${quoteEnd}`;
+          }
+
+          return `${start}${quoteStart}${specifier}${quoteEnd}`;
+        };
+
+        const rewrittenImports = code.replace(importExportRegex, rewrite);
+        return rewrittenImports.replace(dynamicImportRegex, (match, start, quoteStart, specifier, quoteEnd, end) => {
+          const resolved = resolveImport(fileName, specifier);
+
+          if (resolved.kind === "module") {
+            ensureModuleUrl(resolved.value);
+            return `${start}${quoteStart}${moduleUrls[resolved.value]}${quoteEnd}${end}`;
+          }
+
+          if (resolved.kind === "bare") {
+            return `${start}${quoteStart}https://esm.sh/${specifier}${quoteEnd}${end}`;
+          }
+
+          return match;
+        });
+      }
+
+      function ensureModuleUrl(fileName) {
+        if (moduleUrls[fileName]) return moduleUrls[fileName];
+        if (building.has(fileName)) return moduleUrls[fileName];
+
+        const source = moduleByFile[fileName];
+        if (!source) throw new Error(`Missing module file: ${fileName}`);
+
+        building.add(fileName);
+        const transformed = Babel.transform(source, {
+          filename: fileName,
+          sourceType: "module",
+          presets: ["typescript", "react"],
+          retainLines: true,
+        }).code;
+
+        const rewritten = rewriteSpecifiers(transformed, fileName);
+        const blob = new Blob([rewritten], { type: "text/javascript" });
+        moduleUrls[fileName] = URL.createObjectURL(blob);
+        building.delete(fileName);
+        return moduleUrls[fileName];
+      }
+
+      try {
+        const entryUrl = ensureModuleUrl(entryFile);
+        await import(entryUrl);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        document.body.innerHTML = `<pre style="padding:16px;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;white-space:pre-wrap;">Preview failed: ${message}</pre>`;
+      }
+    </script>
+  </body>
+</html>`;
 }
